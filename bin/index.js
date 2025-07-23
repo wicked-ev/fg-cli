@@ -8,16 +8,18 @@ async function main() {
         '--force': Boolean,
         '-c': '--create',
         '-t': Boolean,
-        '-f': '--force'
+        '-f': '--force',
+        '--ignore': Boolean, 
+        '-i': '--ignore'
     });
     
     if (args['--create']) {
         const compType = args['-t'] ? 'tsx' : 'jsx';
-        createComp(args['--create'], args['--force'], compType);
+        createComp(args['--create'], args['--force'], compType, args['--ignore']);
     }
     
-    console.log("hello world testing!");
-    console.log(args);
+    // console.log("hello world testing!");
+    // console.log(args);
 }
 
 main();
