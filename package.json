@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "bin": {
-    "fg" : "./bin/index.js"
+    "fg": "./bin/index.js"
   },
   "main": "index.js",
   "scripts": {
