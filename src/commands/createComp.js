@@ -1,9 +1,7 @@
-import path, { join } from 'path'
+import path from 'path'
 import fs from 'fs';
 import { select } from '@clack/prompts';
-// get the path were it was called for 
-// search for comp dir -> should i make one than add to it? 
-// if comp already exist 
+
 
 export async function createComp (name, force = false, compType = 'jsx', ignoreDefault) {
     
@@ -15,17 +13,19 @@ export default function ${compName}() {
     return (<></>);
 }`; 
 
-    //look for compe folder if found place compe there 
-    //if not look for style folder if found place css sheet there 
-    //if not just place them about in the same current dirctory     
     const currentPath = process.cwd();
 
     if (!ignoreDefault) {
         setupDefaultComponent(currentPath,compName,compType,compContent,force);
 
     } else {
+        setupCustomComponent(currentPath,compName,compType,compContent,force);
+    }
+} 
 
-        const srcDir = await select({
+
+async function setupCustomComponent(currentPath,compName,compType,compContent,force) {
+      const srcDir = await select({
             message: 'create src directory', 
             options: [
                 {value:false, label:'no'},
@@ -47,11 +47,23 @@ export default function ${compName}() {
                 {value:true, label:'yes'},
             ], 
         });
-
+        
+        if(!compDir && !stylesDir) {
+           const writeRoot = await select({
+            message: 'files are being create in root directory are you sure?', 
+            options: [
+                {value:false, label:'no'},
+                {value:true, label:'yes'},
+            ], 
+        }); 
+            if (!writeRoot) {
+            console.log("operation Cancelled");
+            process.exit(0);
+            }
+        }
         let compDirPath = [currentPath];
         let newCompPath = currentPath;
         let newCompStyle = currentPath;
-        
         if (srcDir) {
             compDirPath.push('src');
         }
@@ -74,55 +86,48 @@ export default function ${compName}() {
         
         compDirPath = path.join(...compDirPath);
         
-        fs.mkdirSync(compDirPath, {recursive: true});
-        
-        const fileExists = fs.existsSync(newCompPath);
-        const cssExists = fs.existsSync(newCompStyle);
-
-        if (!fileExists || force) {
-            fs.writeFileSync(newCompPath, compContent);
-            console.log(`✅ ${fileExists ? 'Overwritten' : 'Created' } ${compName}`);
-        } else {
-             console.log(`⚠️  Component ${compName}.${compType} already exists!`);
-        }
-
-        if(!cssExists || force) {
-            fs.writeFileSync(newCompStyle, '');
-            console.log(`✅ ${cssExists ? 'Overwritten' : 'Created' } ${compName}`);
-        } else {
-            console.log(`⚠️  Style ${compName}.css already exists!`);
-        }
-    }
-} 
-
-function setupDefaultComponent(currentPath,compName,compType,compContent,force){
+        createCompFiles(compDirPath,newCompPath,newCompStyle,compName,compType,compContent,force);
+}
+async function setupDefaultComponent(currentPath,compName,compType,compContent,force){
         
         const componentDir = path.join(currentPath, 'src', 'components');
         const stylesDir = path.join(componentDir, 'styles');
         const newCompPath = path.join(componentDir, `${compName}.${compType}`);
         const newCompStyle = path.join(stylesDir, `${compName}.css`);
-    
-        fs.mkdirSync(stylesDir, {recursive: true});
-    
-        const fileExists = fs.existsSync(newCompPath);
-        const cssExists = fs.existsSync(newCompStyle);
-    
-        if (!fileExists || force) {
-            fs.writeFileSync(newCompPath, compContent);
-            console.log(`✅ ${fileExists ? 'Overwritten' : 'Created' } ${compName}`);
-        } else {
-            console.log(`⚠️  Component ${compName}.${compType} already exists!`);
-        }
-        
-        if(!cssExists || force) {
-            fs.writeFileSync(newCompStyle, '');
-            console.log(`✅ ${cssExists ? 'Overwritten' : 'Created' } ${compName}`);
-        } else {
-            console.log(`⚠️  Style ${compName}.css already exists!`);
-        }
+
+        createCompFiles(stylesDir,newCompPath,newCompStyle,compName,compType,compContent,force);
 }
-/*
-fg -c Task
 
+function createCompFiles(dirPath, newCompPath, newCompStyle,compName,compType,compContent
+    ,force) {
+        try {
+            fs.mkdirSync(dirPath, {recursive: true});
+        } catch (error) {
+            console.error('❌ Failed to create directory:', error.message);
+            process.exit(1);
+        }
 
-*/
+        try {
+            const fileExists = fs.existsSync(newCompPath);
+            const cssExists = fs.existsSync(newCompStyle);
+    
+            if (!fileExists || force) {
+                fs.writeFileSync(newCompPath, compContent);
+                console.log(`✅ ${fileExists ? 'Overwritten' : 'Created' } ${compName}`);
+            } else {
+                console.log(`⚠️  Component ${compName}.${compType} already exists! you can use --force or -f to overwrite`);
+            }
+            
+            if(!cssExists || force) {
+                fs.writeFileSync(newCompStyle, '');
+                console.log(`✅ ${cssExists ? 'Overwritten' : 'Created' } ${compName}`);
+            } else {
+                console.log(`⚠️  Style ${compName}.css already exists!  you can use --force or -f to overwrite`);
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to write file:', error.message);
+            process.exit(1);
+        }
+
+}
