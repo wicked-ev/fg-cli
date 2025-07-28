@@ -9,6 +9,8 @@ async function main() {
     "--force": Boolean,
     "--list": Boolean,
     "--ext": String,
+    "--radd": String,
+    "--rset": String,
     "-l": "--list",
     "-c": "--create",
     "-t": Boolean,
@@ -20,6 +22,8 @@ async function main() {
   if (args["--create"]) {
     const compType = args["-t"] ? "tsx" : "jsx";
     createComp(args["--create"], args["--force"], compType, args["--ignore"]);
+
+    
   }
   if (args["--list"]) {
     await listComps(args["--ext"]);
