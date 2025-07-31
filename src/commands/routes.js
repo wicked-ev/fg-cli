@@ -1,17 +1,22 @@
-import fg from "fg";
+import fg from "fast-glob";
 import fs from "fs";
-import { autocomplete, confirm } from "@clack/prompts";
+import { confirm, select, text } from "@clack/prompts";
 import path from "path";
 import chalk from "chalk";
 import babelParser from "@babel/parser";
 import * as recast from "recast";
-export async function addRoute(routerName, routePath, component) {
 
+export async function addRoute(routerName, routePath, component) {
   const currentPath = process.cwd();
+  console.log("current path: " + currentPath);
+
   if (routerName) {
     const router = path.join(currentPath, `${routerName}.jsx`);
+    console.log("given router path: " + router);
     if (fs.existsSync(router)) {
+      console.log("router exsits");
       if (isValidRouter(router)) {
+        console.log("router is valid");
         //insert new route
         insertRouteJSXElement(router, routePath, component);
       } else {
@@ -31,19 +36,23 @@ export async function addRoute(routerName, routePath, component) {
     }
   }
 
-  const routers = scanForRouters();
+  const routers = await scanForRouters();
+
   const options = [];
+  for (const r of routers) {
+    console.log("route: " + r);
+  }
   if (routers) {
     for (const router of routers) {
       options.push({ value: router, label: path.basename(router) });
     }
-    const selectedRouter = await autocomplete({
+    const selectedRouter = await select({
       message: "Select Components",
-      options: options,
-      placeholder: "Type to search...",
+      options: [...options],
       maxItems: 5,
     });
     //insert
+    insertRouteJSXElement(selectedRouter, routePath, component);
   } else {
     console.log(chalk.red("No viable router files found"));
     process.exit(1);
@@ -57,16 +66,18 @@ async function scanForRouters() {
 
   const routers = [];
   for (const file of files) {
-    if (isValidRouter(file)) {
+    console.log("file jsx: " + file);
+    if (isValidRouter(path.join(process.cwd(), file))) {
       routers.push(file);
     }
   }
+  // console.log("routers found after scanning: " + routers);
   return routers;
 }
 
 function readFileContent(filePath) {
   try {
-    const content = fs.readFileSync(filePath, options, callback);
+    const content = fs.readFileSync(filePath);
     return content;
   } catch (error) {
     console.error(`error reading ${filePath}: ${error.message}`);
@@ -84,11 +95,12 @@ function writeFileContent(filePath, content) {
 
 function isValidRouter(filePath) {
   const sourceCode = readFileContent(filePath);
-  if(!sourceCode) return false;
-  
+  console.log("source Code ready");
+  if (!sourceCode) return false;
+
   let isRouter = false;
   const ast = getAST(sourceCode);
-
+  console.log("ast ready");
   recast.types.visit(ast, {
     visitJSXElement(path) {
       const openEl = path.node.openingElement;
@@ -110,17 +122,21 @@ function isValidRouter(filePath) {
 }
 
 function getAST(sourceCode) {
-  const ast = recast.parse(sourceCode, {
-    parser: {
-      parse(code) {
-        return babelParser.parse(code, {
-          sourceType: "module",
-          plugins: ["jsx"],
-        });
+  try {
+    const ast = recast.parse(sourceCode, {
+      parser: {
+        parse(source) {
+          return babelParser.parse(source, {
+            sourceType: "module",
+            plugins: ["jsx"],
+          });
+        },
       },
-    },
-  });
-  return ast;
+    });
+    return ast;
+  } catch (error) {
+    console.error("error parsing AST: " + error.message);
+  }
 }
 
 async function insertRouteJSXElement(router, routePath, component) {
