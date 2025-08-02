@@ -4,7 +4,13 @@ import { confirm, select, text } from "@clack/prompts";
 import path from "path";
 import chalk from "chalk";
 import babelParser from "@babel/parser";
-import * as recast from "recast";
+import traverse from "@babel/traverse";
+import generate from "@babel/generator";
+import * as t from "@babel/types";
+
+// import * as recast from "recast";
+// import { namedTypes } from "ast-types";
+
 
 export async function addRoute(routerName, routePath, component) {
   const currentPath = process.cwd();
@@ -12,16 +18,13 @@ export async function addRoute(routerName, routePath, component) {
 
   if (routerName) {
     const router = path.join(currentPath, `${routerName}.jsx`);
-    console.log("given router path: " + router);
     if (fs.existsSync(router)) {
-      console.log("router exsits");
       if (isValidRouter(router)) {
-        console.log("router is valid");
         //insert new route
         insertRouteJSXElement(router, routePath, component);
       } else {
         console.log(
-          chalk.red(`jsx file named ${routerName} is not valid router`),
+          chalk.red(`jsx file named ${routerName} is not valid router`)
         );
         process.exit(0);
       }
@@ -30,7 +33,7 @@ export async function addRoute(routerName, routePath, component) {
         message: `No .jsx file named ${routerName} in This directory, would you like to search for vaible router in this directory`,
       });
       if (!confirmRouterSearch) {
-        console.log(chalk.red("Operation cancled"));
+        console.log(chalk.red("Operation canceled"));
         process.exit(0);
       }
     }
@@ -67,6 +70,7 @@ async function scanForRouters() {
   const routers = [];
   for (const file of files) {
     console.log("file jsx: " + file);
+    
     if (isValidRouter(path.join(process.cwd(), file))) {
       routers.push(file);
     }
@@ -101,21 +105,14 @@ function isValidRouter(filePath) {
   let isRouter = false;
   const ast = getAST(sourceCode);
   console.log("ast ready");
-  recast.types.visit(ast, {
-    visitJSXElement(path) {
-      const openEl = path.node.openingElement;
-      const tagName = path.openingElement.name.name;
-      const n = recast.types.namedTypes;
-      if (
-        tagName == "Routes" ||
-        tagName == "BrowserRouter" ||
-        tagName == "Route"
-      ) {
+  
+  traverse(ast, {
+    jsxElement(path) {
+      const tag = path.node.openingElement; 
+      if(t.jsxIdentifier(tag.name, {name: "Route"}) || t.jsxIdentifier(tag.name, {name: "BrowserRouter"}) || t.jsxIdentifier(tag.name, { name: "Routes"})) {
         isRouter = true;
-        return false;
       }
-      this.traverse(path);
-    },
+    }
   });
 
   return isRouter;
@@ -123,68 +120,97 @@ function isValidRouter(filePath) {
 
 function getAST(sourceCode) {
   try {
-    const ast = recast.parse(sourceCode, {
-      parser: {
-        parse(source) {
-          return babelParser.parse(source, {
-            sourceType: "module",
-            plugins: ["jsx"],
-          });
-        },
-      },
+    const ast = babelParser.parse(sourceCode, {
+      sourceType: "module",
+      plugins: ["jsx"],
     });
+    // const ast = recast.parse(sourceCode, {
+    //   parser: {
+    //     parse(source) {
+    //       return babelParser.parse(source, {
+    //         sourceType: "module",
+    //         plugins: ["jsx"],
+    //       });
+    //     },
+    //   },
+    // });
     return ast;
   } catch (error) {
-    console.error("error parsing AST: " + error.message);
+    throw new Error("error parsing AST: " + error.message);
   }
 }
 
 async function insertRouteJSXElement(router, routePath, component) {
   const sourceCode = readFileContent(router);
   const ast = getAST(sourceCode);
-  recast.types.visit(ast, {
-    visitJSXElement(path) {
-      const element = path.node.openingElement;
-      const elementName = path.node.name.name;
-      const namedTypes = recast.types.namedTypes;
-      const b = recast.types.builders;
-      if (element && elementName == "Route") {
-        const attributes = element.attributes;
-        for (const attr of attributes) {
+  traverse.default(ast, {
+    JSXElement(path) {
+      const tag = path.node.openingElement;
+      if (t.isJSXIdentifier(tag.name, {name: "Route"})) {
+        for (const attr of tag.attributes) {
           if (
-            namedTypes.JSXAttribute.check(attr) &&
+            attr.type == "JSXAttribute" &&
             attr.name.name == "path" &&
-            attr.value.type == "Literal" &&
+            attr.value.type == "StringLiteral" &&
             attr.value.value == "/"
           ) {
-            const newRoute = createJSXRouteElement(routePath, component);
-
-            insertElement(path, newRoute);
-
-            return false;
-          } else if (
-            namedTypes.JSXAttribute.check(attr) &&
-            attr.name.name == "Routes"
-          ) {
-            //insert route
-            const newRoute = createJSXRouteElement(routePath, component);
-            insertElement(path, newRoute);
-            return false;
-          } else if (
-            namedTypes.JSXAttribute.check(value) &&
-            attr.name.name == "BrowserRouter"
-          ) {
-            //insert Routes than route
-            const routes = createJSXRoutes(routePath, component);
-            insertElement(path, routes);
-            return false;
+            const newRoute = createJSXRouteElement(routePath,component);
+            path.insertAfter(newRoute);
           }
-          this.traverse(path);
         }
+      } else if (t.isJSXIdentifier(tag.name, {name: "Routes"})) {
+        const newRoute = createJSXRouteElement(routePath, component);
+        path.insertAfter(newRoute)
+      } else if (t.isJSXIdentifier(tag.name, {name: "BrowserRouter"})) {
+        const routes = createJSXRoutes(routePath, component);
+        path.insertAfter(routes);
       }
-    },
+     },
   });
-  const updateCode = recast.print(ast).code;
+
+  // recast.types.visit(ast, {
+  //   visitJSXElement(path) {
+  //     const element = path.node.openingElement;
+  //     const elementName = path.node.name.name;
+  //     const namedTypes = recast.types.namedTypes;
+  //     const b = recast.types.builders;
+  //     if (element && elementName == "Route") {
+  //       const attributes = element.attributes;
+  //       for (const attr of attributes) {
+  //         if (
+  //           namedTypes.JSXAttribute.check(attr) &&
+  //           attr.name.name == "path" &&
+  //           attr.value.type == "Literal" &&
+  //           attr.value.value == "/"
+  //         ) {
+  //           const newRoute = createJSXRouteElement(routePath, component);
+
+  //           insertElement(path, newRoute);
+
+  //           return false;
+  //         } else if (
+  //           namedTypes.JSXAttribute.check(attr) &&
+  //           attr.name.name == "Routes"
+  //         ) {
+  //           //insert route
+  //           const newRoute = createJSXRouteElement(routePath, component);
+  //           insertElement(path, newRoute);
+  //           return false;
+  //         } else if (
+  //           namedTypes.JSXAttribute.check(value) &&
+  //           attr.name.name == "BrowserRouter"
+  //         ) {
+  //           //insert Routes than route
+  //           const routes = createJSXRoutes(routePath, component);
+  //           insertElement(path, routes);
+  //           return false;
+  //         }
+  //         this.traverse(path);
+  //       }
+  //     }
+  //   },
+  // });
+  const updateCode = generate(ast).code;
   writeFileContent(router, updateCode);
   //first look for route with path / if not
   // look for Routes Element to insert if not
@@ -195,51 +221,107 @@ function insertElement(path, element) {
   path.node.children.push(b.jsxText("\n "), element, b.jsxText("\n "));
 }
 function createJSXRouteElement(routePath, component) {
-  const builder = recast.types.builders;
-  const newRoute = builder.jsxElement(
-    builder.jsxOpeningElement(
-      builder.jsxIdentifier("Route"),
+  const route = t.jsxElement(
+    t.jsxOpeningElement(
+      t.jsxIdentifier("Route"),
       [
-        builder.jsxAttribute(
-          builder.jsxIdentifier("path"),
-          builder.literal(routePath),
+        t.jsxAttribute(
+          t.jsxIdentifier("path"), 
+          t.stringLiteral(routePath)
         ),
-        builder.jsxAttribute(
-          builder.jsxIdentifier("element"),
-          builder.literal(component),
-        ),
+        t.jsxAttribute(t.jsxIdentifier("element"),
+            t.jsxExpressionContainer(
+               t.jsxElement(
+                t.jsxOpeningElement(t.jsxIdentifier(component), [], true),
+                null,
+                [],
+                true
+               )
+            )
+          ),
       ],
-      true,
+      true
     ),
+    null,
+    [],
+    true
   );
-  return newRoute;
+
+  // const builder = recast.types.builders;
+  // const newRoute = builder.jsxElement(
+  //   builder.jsxOpeningElement(
+  //     builder.jsxIdentifier("Route"),
+  //     [
+  //       builder.jsxAttribute(
+  //         builder.jsxIdentifier("path"),
+  //         builder.literal(routePath),
+  //       ),
+  //       builder.jsxAttribute(
+  //         builder.jsxIdentifier("element"),
+  //         builder.literal(component),
+  //       ),
+  //     ],
+  //     true,
+  //   ),
+  // );
+  return route;
 }
 
 function createJSXRoutes(routePath, component) {
-  const builder = recast.types.builders;
-  const newElement = builder.jsxElement(
-    builder.jsxOpeningElement(builder.jsxIdentifier("Routes"), []),
-    builder.jsxClosingElement(builder.jsxIdentifier("Routes")),
+  const routes = t.jsxElement(
+    t.jsxOpeningElement(t.jsxIdentifier("Routes"), []),
+    t.jsxClosingElement(t.jsxIdentifier("Routes")),
     [
-      builder.jsxElement(
-        builder.jsxOpeningElement(
-          builder.jsxIdentifier("Route"),
+      t.jsxElement(
+        t.jsxOpeningElement(
+          t.jsxIdentifier("Route"),
           [
-            builder.jsxAttribute(
-              builder.jsxIdentifier("path"),
-              builder.literal(routePath),
-            ),
-            builder.jsxAttribute(
-              builder.jsxIdentifier("element"),
-              builder.literal(component),
+            t.jsxAttribute(t.jsxIdentifier("path"), t.stringLiteral(routePath)),
+            t.jsxAttribute(
+              t.jsxIdentifier("element"),
+              t.jsxExpressionContainer(
+                t.jsxElement(
+                  t.jsxOpeningElement(t.jsxIdentifier(component), [], true),
+                  null,
+                  [],
+                  true
+                )
+              )
             ),
           ],
-          true,
+          true // self-closing
         ),
+        null,
+        [],
+        true
       ),
-    ],
+    ]
   );
-  return newElement;
+
+  // const builder = recast.types.builders;
+  // const newElement = builder.jsxElement(
+  //   builder.jsxOpeningElement(builder.jsxIdentifier("Routes"), []),
+  //   builder.jsxClosingElement(builder.jsxIdentifier("Routes")),
+  //   [
+  //     builder.jsxElement(
+  //       builder.jsxOpeningElement(
+  //         builder.jsxIdentifier("Route"),
+  //         [
+  //           builder.jsxAttribute(
+  //             builder.jsxIdentifier("path"),
+  //             builder.literal(routePath)
+  //           ),
+  //           builder.jsxAttribute(
+  //             builder.jsxIdentifier("element"),
+  //             builder.literal(component)
+  //           ),
+  //         ],
+  //         true
+  //       )
+  //     ),
+  //   ]
+  // );
+  return routes;
 }
 // const route = builder.jsxElement(
 //   builder.jsxOpeningElement(builder.jsxIdentifier("Route")),
