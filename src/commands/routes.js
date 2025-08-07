@@ -7,20 +7,34 @@ import babelParser from "@babel/parser";
 import traverse from "@babel/traverse";
 import { generate } from "@babel/generator";
 import * as t from "@babel/types";
+import prettier from "prettier";
 
-// import * as recast from "recast";
-// import { namedTypes } from "ast-types";
-
+//todo:  recast library from the project
+//todo: better logs
+//todo: refactor addRoute function (again) 
 export async function addRoute(routerName, routePath, component) {
   const currentPath = process.cwd();
-  console.log("current path: " + currentPath);
-
+  //checking if routerName is valid JSX file
   if (routerName) {
-    const router = path.join(currentPath, `${routerName}.jsx`);
-    if (fs.existsSync(router)) {
+    let isJSXfile = false;
+    let router;
+    const files = await fg([`**/*.jsx`, "!node_modules/**", "!.git/   **"], {
+      dot: true,
+      });
+    for (const file of files) {
+      const baseName = path.basename(file);
+      if (routerName == path.parse(baseName).name) {
+        isJSXfile = true;
+        router = path.join(process.cwd(),file);
+      }
+    }
+    //if routerName is JSX file we check if it is valid router then we parse and add the route
+    if (isJSXfile) {
       if (isValidRouter(router)) {
         //insert new route
         insertRouteJSXElement(router, routePath, component);
+        console.log(`route ${routePath} has been added to ${router}`);
+        process.exit(1);
       } else {
         console.log(
           chalk.red(`jsx file named ${routerName} is not valid router`)
@@ -29,7 +43,7 @@ export async function addRoute(routerName, routePath, component) {
       }
     } else {
       const confirmRouterSearch = await confirm({
-        message: `No .jsx file named ${routerName} in This directory, would you like to search for vaible router in this directory`,
+        message: `No .jsx file named ${routerName} in This directory, would you like to search for viable router's in this directory`,
       });
       if (!confirmRouterSearch) {
         console.log(chalk.red("Operation canceled"));
@@ -39,7 +53,6 @@ export async function addRoute(routerName, routePath, component) {
   }
 
   const routers = await scanForRouters();
-
   const options = [];
   for (const r of routers) {
     console.log("route: " + r);
@@ -68,8 +81,6 @@ async function scanForRouters() {
 
   const routers = [];
   for (const file of files) {
-    console.log("file jsx: " + file);
-
     if (isValidRouter(path.join(process.cwd(), file))) {
       routers.push(file);
     }
@@ -109,10 +120,9 @@ function isValidRouter(filePath) {
     JSXElement(path) {
       const tag = path.node.openingElement.name;
       // console.log(JSON.stringify(tag, null, 2));
-      if (
-        t.jsxIdentifier(tag.name, "Route") ||
-        t.jsxIdentifier(tag.name, "BrowserRouter") ||
-        t.jsxIdentifier(tag.name, "Routes")
+      if ( t.isJSXIdentifier(tag) && (tag.name === "Route" ||
+                                      tag.name === "BrowserRoute" ||
+                                      tag.name === "Routes")
       ) {
         isRouter = true;
       }
@@ -136,6 +146,19 @@ function getAST(sourceCode) {
   }
 }
 
+
+function checkForBaseRoute(path, t) {
+  const baseRoute = path.node.children.find(
+    child => t.isJSXElement(child) &&
+    child.openingElement.name.name ==="Route" &&
+    child.openingElement.attributes.some(
+      attr => t.isJSXAttribute(attr) &&
+      attr.name.name === "path" && 
+      attr.value.type === "StringLiteral" &&
+      attr.value.value === "/"  )
+    ); 
+  return baseRoute;
+}
 async function insertRouteJSXElement(router, routePath, component) {
   const sourceCode = readFileContent(router).toString();
   const ast = getAST(sourceCode);
@@ -146,11 +169,27 @@ async function insertRouteJSXElement(router, routePath, component) {
       JSXElement(path) {
         const tag = path.node.openingElement.name;
         if (t.isJSXIdentifier(tag) && tag.name === "Routes") {
-          // Insert new Route as a child of <Routes>
-          const newRoute = createJSXRouteElement(routePath, component);
-          path.node.children.push(newRoute);
-          inserted = true;
-          path.stop(); // Stop traversal after insertion
+          // Check for Base Route Tag Child of <Routes>
+          const baseRoute = checkForBaseRoute(path, t); 
+          if(baseRoute) {
+            // Check if element self closing if yes add closing tag
+            if(baseRoute.openingElement.selfClosing) {
+              baseRoute.openingElement.selfClosing = false;
+              baseRoute.closingElement = t.jsxClosingElement(
+                t.jSXIdentifier("Route"));   
+              } 
+              baseRoute.children = baseRoute.children || [];
+              baseRoute.children.push(createJSXRouteElement(routePath, component));
+              inserted = true;
+              path.stop();
+          } else {
+            // Insert new Route as a child of <Routes>
+            const newRoute = createJSXRouteElement(routePath, component);
+            path.node.children.push(newRoute);
+            inserted = true;
+            // Stop traversal after insertion
+            path.stop();
+          }
         }
       },
     });
@@ -163,8 +202,22 @@ async function insertRouteJSXElement(router, routePath, component) {
   }
 
   // Update code and write to file
-  const updatedCode = generate(ast).code;
-  writeFileContent(router, updatedCode);
+  const updatedCode = generate(ast, {
+    compact: false,
+    concise: false,
+    retainLines: false,
+    decoratorsBeforeExport: true, 
+    jsescOption: { minimal: true}
+
+  }).code;
+
+  const formatedCode = await prettier.format(updatedCode, {
+      parser: "babel",
+      semi: true,
+      singleQuote: true,
+      tabWidth: 2,
+  })
+  writeFileContent(router, formatedCode);
 }
 
 function createJSXRouteElement(routePath, component) {
@@ -193,38 +246,4 @@ function createJSXRouteElement(routePath, component) {
   );
 
   return route;
-}
-
-function createJSXRoutes(routePath, component) {
-  const routes = t.jsxElement(
-    t.jsxOpeningElement(t.jsxIdentifier("Routes"), []),
-    t.jsxClosingElement(t.jsxIdentifier("Routes")),
-    [
-      t.jsxElement(
-        t.jsxOpeningElement(
-          t.jsxIdentifier("Route"),
-          [
-            t.jsxAttribute(t.jsxIdentifier("path"), t.stringLiteral(routePath)),
-            t.jsxAttribute(
-              t.jsxIdentifier("element"),
-              t.jsxExpressionContainer(
-                t.jsxElement(
-                  t.jsxOpeningElement(t.jsxIdentifier(component), [], true),
-                  null,
-                  [],
-                  true
-                )
-              )
-            ),
-          ],
-          true // self-closing
-        ),
-        null,
-        [],
-        true
-      ),
-    ]
-  );
-
-  return routes;
 }
