@@ -9,9 +9,9 @@ import { generate } from "@babel/generator";
 import * as t from "@babel/types";
 import prettier from "prettier";
 
-//todo:  recast library from the project
-//todo: better logs
-//todo: refactor addRoute function (again)
+
+//todo: better logs using chalk and maybe clack
+
 export async function addRoute(routerName, routePath, component) {
   //checking if routerName is valid JSX file
   if (routerName) {
