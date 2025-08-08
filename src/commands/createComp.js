@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { select } from "@clack/prompts";
+import { success, error , warning, info } from './log.js';
 
 export async function createComp(
   name,
@@ -80,7 +81,7 @@ async function setupCustomComponent(
       ],
     });
     if (!writeRoot) {
-      console.log("operation Cancelled");
+      warning("operation Cancelled");
       process.exit(0);
     }
   }
@@ -103,9 +104,9 @@ export default function ${compName}() {
     return (<></>);
 }`;
   }
-  console.log("compDirPath:" + compDirPath);
-  console.log("compStyle:" + newCompStyle);
-  console.log("compPath:" + newCompPath);
+  info("compDirPath:" + compDirPath);
+  info("compStyle:" + newCompStyle);
+  info("compPath:" + newCompPath);
   compDirPath = path.join(...compDirPath);
 
   createCompFiles(
@@ -152,9 +153,9 @@ function createCompFiles(
 ) {
   try {
     fs.mkdirSync(dirPath, { recursive: true });
-  } catch (error) {
-    console.error("❌ Failed to create directory:", error.message);
-    process.exit(1);
+  } catch (err) {
+    error("❌ Failed to create directory:", err.message);
+    process.exit(0);
   }
 
   try {
@@ -163,23 +164,23 @@ function createCompFiles(
 
     if (!fileExists || force) {
       fs.writeFileSync(newCompPath, compContent);
-      console.log(`✅ ${fileExists ? "Overwritten" : "Created"} ${compName}`);
+      success(`${fileExists ? "Overwritten" : "Created"} ${compName}`);
     } else {
-      console.log(
-        `⚠️  Component ${compName}.${compType} already exists! you can use --force or -f to overwrite`
+      warning(
+        `Component ${compName}.${compType} already exists! you can use --force or -f to overwrite`
       );
     }
 
     if (!cssExists || force) {
       fs.writeFileSync(newCompStyle, "");
-      console.log(`✅ ${cssExists ? "Overwritten" : "Created"} ${compName}`);
+      success(`${cssExists ? "Overwritten" : "Created"} ${compName}`);
     } else {
-      console.log(
-        `⚠️  Style ${compName}.css already exists!  you can use --force or -f to overwrite`
+      warning(
+        `Style ${compName}.css already exists!  you can use --force or -f to overwrite`
       );
     }
   } catch (error) {
-    console.error("❌ Failed to write file:", error.message);
-    process.exit(1);
+    error("Failed to write file:", error.message);
+    process.exit(0);
   }
 }
