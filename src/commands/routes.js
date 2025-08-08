@@ -1,6 +1,7 @@
 import fg from "fast-glob";
 import fs from "fs";
 import { confirm, select, text } from "@clack/prompts";
+import { success, error, info, warning } from './log.js';
 import path from "path";
 import chalk from "chalk";
 import babelParser from "@babel/parser";
@@ -21,22 +22,22 @@ export async function addRoute(routerName, routePath, component) {
       if (isValidRouter(router)) {
         //insert new route
         await insertRouteJSXElement(router, routePath, component);
-        console.log(`route ${routePath} has been added to ${routerName}`);
+        success(`route ${routePath} has been added to ${routerName}`);
         process.exit(1);
       } else {
         console.log(
-          chalk.red(`jsx file named ${routerName} is not valid router`)
+        error(`jsx file named ${routerName} is not valid router`) 
         );
         process.exit(0);
       }
     } else {
       const confirmRouterSearch = await confirm({
-        message: `No .jsx file named ${routerName} in This directory, would you like to search for viable router's in this directory`,
+        message: `No .jsx file named ${routerName} in This directory, would you like to search for viable router's in this directory?`,
       });
       if (confirmRouterSearch) {
         handleRouterSearch(routePath, component);
       } else {
-        console.log(chalk.red("Operation canceled"));
+        warning("Operation canceled");
         process.exit(0);
       }
     }
@@ -59,11 +60,11 @@ async function handleRouterSearch(routePath, component) {
     if (selectedRouter) {
       await insertRouteJSXElement(selectedRouter, routePath, component);
     } else {
-      console.log(chalk.red("Operation canceled"));
+      warning("Operation canceled");
       process.exit(0);
     }
   } else {
-    console.log(chalk.red("No viable router files found"));
+    error("No viable router files found");
     process.exit(1);
   }
 }
@@ -103,7 +104,7 @@ function readFileContent(filePath) {
     const content = fs.readFileSync(filePath);
     return content;
   } catch (error) {
-    console.error(`error reading ${filePath}: ${error.message}`);
+    throw new Error(`error reading ${filePath}: ${error.message}`);
   }
 }
 
@@ -112,7 +113,7 @@ function writeFileContent(filePath, content) {
     fs.writeFileSync(filePath, content);
     return true;
   } catch (error) {
-    console.error(`error writing to ${filePath}: ${error.message}`);
+    throw new Error(`error writing to ${filePath}: ${error.message}`);
   }
 }
 
