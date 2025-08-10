@@ -7,10 +7,11 @@ export async function createComp(
   name,
   force = false,
   compType = "jsx",
+  cssType,
   ignoreDefault
 ) {
   const compName = name[0].toUpperCase() + name.slice(1);
-  let compContent = `import './styles/${compName}.css';
+  let compContent = `import './styles/${compName}.${cssType}';
 
 export default function ${compName}() {
 
@@ -24,6 +25,7 @@ export default function ${compName}() {
       currentPath,
       compName,
       compType,
+      cssType,
       compContent,
       force
     );
@@ -32,6 +34,7 @@ export default function ${compName}() {
       currentPath,
       compName,
       compType,
+      cssType,
       compContent,
       force
     );
@@ -42,6 +45,7 @@ async function setupCustomComponent(
   currentPath,
   compName,
   compType,
+  cssType,
   compContent,
   force
 ) {
@@ -70,7 +74,7 @@ async function setupCustomComponent(
 
   let compDirPath = [currentPath];
   let newCompPath = path.join(currentPath, `${compName}.${compType}`);
-  let newCompStyle = path.join(currentPath, `${compName}.css`);
+  let newCompStyle = path.join(currentPath, `${compName}.${cssType}`);
 
   if (!compDir && !stylesDir) {
     const writeRoot = await select({
@@ -95,9 +99,9 @@ async function setupCustomComponent(
 
   if (stylesDir) {
     compDirPath.push("styles");
-    newCompStyle = path.join(...compDirPath, `${compName}.css`);
+    newCompStyle = path.join(...compDirPath, `${compName}.${cssType}`);
   } else {
-    compContent = `import './${compName}.css';
+    compContent = `import './${compName}.${cssType}';
 
 export default function ${compName}() {
 
@@ -115,6 +119,7 @@ export default function ${compName}() {
     newCompStyle,
     compName,
     compType,
+    cssType,
     compContent,
     force
   );
@@ -123,13 +128,14 @@ async function setupDefaultComponent(
   currentPath,
   compName,
   compType,
+  cssType,
   compContent,
   force
 ) {
   const componentDir = path.join(currentPath, "src", "components");
   const stylesDir = path.join(componentDir, "styles");
   const newCompPath = path.join(componentDir, `${compName}.${compType}`);
-  const newCompStyle = path.join(stylesDir, `${compName}.css`);
+  const newCompStyle = path.join(stylesDir, `${compName}.${cssType}`);
 
   createCompFiles(
     stylesDir,
@@ -137,6 +143,7 @@ async function setupDefaultComponent(
     newCompStyle,
     compName,
     compType,
+    cssType,
     compContent,
     force
   );
@@ -148,6 +155,7 @@ function createCompFiles(
   newCompStyle,
   compName,
   compType,
+  cssType,
   compContent,
   force
 ) {
@@ -176,7 +184,7 @@ function createCompFiles(
       success(`${cssExists ? "Overwritten" : "Created"} ${compName}`);
     } else {
       warning(
-        `Style ${compName}.css already exists!  you can use --force or -f to overwrite`
+        `Style ${compName}.${cssType} already exists!  you can use --force or -f to overwrite`
       );
     }
   } catch (error) {
