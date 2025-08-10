@@ -3,7 +3,6 @@ import fs from "fs";
 import { confirm, select, text } from "@clack/prompts";
 import { success, error, info, warning } from './log.js';
 import path from "path";
-import chalk from "chalk";
 import babelParser from "@babel/parser";
 import traverse from "@babel/traverse";
 import { generate } from "@babel/generator";
@@ -11,7 +10,6 @@ import * as t from "@babel/types";
 import prettier from "prettier";
 
 
-//todo: better logs using chalk and maybe clack
 
 export async function addRoute(routerName, routePath, component) {
   //checking if routerName is valid JSX file
