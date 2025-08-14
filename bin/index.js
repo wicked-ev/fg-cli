@@ -5,7 +5,6 @@ import { createHook } from "../src/commands/createHook.js";
 import { listComps } from "../src/commands/listFiles.js";
 import { addRoute } from "../src/commands/routes.js";
 
-//todo: create hooks 
 //todo: command that can look for JSX Element and changes its Identifier
 
 async function main() {
@@ -50,12 +49,12 @@ async function main() {
     program.
       command("list")
         .description("list files based on extensions (default is .jsx)")
-        .option("-e, --ext <ext>", "specifies extension type")
-        .action((option) => {
-          listComps(option.ext);
+        .option("-n, --name <name>", "specifies file name to search for") 
+        .option("-e, --ext <ext...>", "specifies one or many extensions to search for")
+        .action((options) => {
+          listComps(options.name,options.ext);
         });
 
-    // fg hr <name>
     program.parse();
 }
 
