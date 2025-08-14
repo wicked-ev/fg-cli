@@ -3,34 +3,40 @@ import { confirm } from "@clack/prompts";
 import fs from 'fs';
 
 
+const hookTemplate = (hookName) => {
+   
+    return `import { useState, useEffect } from 'react';
+    
+    export default function ${hookName}() {
+        return 0;  
+    }`;
+}
 
-export async function createHook(hookName,ignore) {
-    //first check if name is valid 
-    let hook = "use" +  hookName[0].toUpperCase() + name.slice(1);
-    const currentPath = process.cwd();
-    //use fast glob too look for the directory
-    //or this works ? 
-    const hookDir = path.join(currentPath,"hooks");
-    if (!fs.existsSync(hook)) {
-        const createHookDir = await confirm({
-            message: "no hooks directory was found. would you like to create one with your hook in it?"
-        }); 
+function createHookFile(hookName, hookDir) {
+  const filePath = path.join(hookDir, `${hookName}.js`);
+  fs.writeFileSync(filePath, hookTemplate(hookName), 'utf-8');
+}
 
-        if (createHookDir) {
-            // do it here 
-        } else {
-            const createWithNoDir = await confirm({
-                message: "create hook in this directory"
-            })
+export async function createHook(hookName, ignore) {
+  const hook = "use" + hookName[0].toUpperCase() + hookName.slice(1);
+  const hookDir = path.join(process.cwd(), "hooks");
 
-            if(createWithNoDir) {
-                //handel it here
-            }
-        }
+  if (!fs.existsSync(hookDir)) {
+    if (!ignore) {
+      fs.mkdirSync(hookDir, { recursive: true });
+      createHookFile(hook, hookDir);
+    } else {
+      const createHookDir = await confirm({
+        message: "No hooks directory found. Create one?"
+      });
+      if (createHookDir) {
+        fs.mkdirSync(hookDir, { recursive: true });
+        createHookFile(hook, hookDir);
+      } else {
+        createHookFile(hook, process.cwd());
+      }
     }
-    //check for hook directory
-        //if yes create there
-        //if no ask user if we should create one 
-            //add --ignore option to create the hook without the hook directory
-
+  } else {
+    createHookFile(hook, hookDir);
+  }
 }

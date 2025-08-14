@@ -10,8 +10,8 @@ import { addRoute } from "../src/commands/routes.js";
 
 async function main() {
   const program = new Command();
-    program.
-      name("fg")
+    program
+      .name("fg")
       .description("CLI tool to help with react development")
       .version("0.0.1");
 
@@ -34,11 +34,11 @@ async function main() {
         createComp(compName, options.force, type, cssType, options.ignore);
       });
       
-      program.command("hr <hookName>")
+     program.command("hr <hookName>")
           .description("creates custom react hook template")
           .option("-i, --ignore", "ignores to check for hooks directory")
           .action((hookName, options) => {
-            createHook(hookName,options.ignore);
+            createHook(hookName, options.ignore);
           })
     program.
       command("arr <router> <path> <component>")
